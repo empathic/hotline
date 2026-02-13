@@ -1,0 +1,15 @@
+name = "hotline-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# All config is set as secrets (encrypted, not in source):
+#   wrangler secret put LINEAR_API_KEY
+#   wrangler secret put LINEAR_TEAM_ID
+#   wrangler secret put LINEAR_PROJECT_ID
+
+# Rate limiting via KV namespace (optional).
+# Create with: wrangler kv namespace create RATE_LIMIT
+# Then uncomment and fill in the id:
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = ""

@@ -1,0 +1,24 @@
+[package]
+name = "hotln"
+version = "0.1.0"
+edition = "2024"
+description = "File bug reports to Linear from distributed applications"
+license = "Apache-2.0"
+
+[[bin]]
+name = "hotln"
+required-features = ["cli"]
+
+[features]
+cli = ["dep:clap", "dep:anyhow"]
+
+[dependencies]
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+ureq = "2"
+clap = { version = "4", optional = true, features = ["derive", "env"] }
+anyhow = { version = "1", optional = true }
+
+[dev-dependencies]
+mockito = "1"
