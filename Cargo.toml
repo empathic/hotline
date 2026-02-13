@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "File bug reports to Linear from distributed applications"
 license = "Apache-2.0"
+repository = "https://github.com/empathic/hotline"
 
 [[bin]]
 name = "hotln"
