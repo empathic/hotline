@@ -4,8 +4,9 @@
 //! the API key (recommended for open source / distributed binaries).
 //!
 //! ```no_run
-//! // Via proxy
+//! // Via proxy (with optional bearer token)
 //! hotln::proxy("https://your-worker.example.com")
+//!     .with_token("secret-token")
 //!     .create_issue("crash on startup", Some("details..."), &[("OS", "macos")])?;
 //!
 //! // Direct
@@ -40,6 +41,7 @@ pub struct DirectClient {
 /// A client that posts bug reports to a proxy URL.
 pub struct ProxyClient {
     url: String,
+    token: Option<String>,
 }
 
 /// Create a client that calls Linear's GraphQL API directly.
@@ -55,6 +57,7 @@ pub fn direct(api_key: &str, team_id: &str, project_id: &str) -> DirectClient {
 pub fn proxy(url: &str) -> ProxyClient {
     ProxyClient {
         url: url.to_string(),
+        token: None,
     }
 }
 
@@ -106,6 +109,12 @@ impl DirectClient {
 }
 
 impl ProxyClient {
+    /// Set a bearer token for proxy authentication.
+    pub fn with_token(mut self, token: &str) -> Self {
+        self.token = Some(token.to_string());
+        self
+    }
+
     /// Create a bug report issue via the proxy. Returns the URL of the created issue.
     pub fn create_issue(
         &self,
@@ -121,10 +130,12 @@ impl ProxyClient {
         });
         let body = payload.to_string();
 
-        let resp_str = match ureq::post(&self.url)
-            .set("Content-Type", "application/json")
-            .send_string(&body)
-        {
+        let mut req = ureq::post(&self.url).set("Content-Type", "application/json");
+        if let Some(token) = &self.token {
+            req = req.set("Authorization", &format!("Bearer {}", token));
+        }
+
+        let resp_str = match req.send_string(&body) {
             Ok(resp) => resp
                 .into_string()
                 .map_err(|e| Error::Http(e.to_string()))?,
@@ -293,6 +304,32 @@ mod tests {
             .unwrap();
 
         assert_eq!(url, "https://linear.app/empathic/issue/EMP-99");
+        mock.assert();
+    }
+
+    #[test]
+    fn test_proxy_with_token() {
+        let mut server = mockito::Server::new();
+        let mock = server
+            .mock("POST", "/")
+            .match_header("Authorization", "Bearer my-secret-token")
+            .match_header("Content-Type", "application/json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "url": "https://linear.app/empathic/issue/EMP-100"
+                })
+                .to_string(),
+            )
+            .create();
+
+        let client = proxy(&server.url()).with_token("my-secret-token");
+        let url = client
+            .create_issue("Bug Report: auth test", Some("desc"), &[])
+            .unwrap();
+
+        assert_eq!(url, "https://linear.app/empathic/issue/EMP-100");
         mock.assert();
     }
 

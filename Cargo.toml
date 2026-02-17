@@ -1,6 +1,6 @@
 [package]
 name = "hotln"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "File bug reports to Linear from distributed applications"
 license = "Apache-2.0"

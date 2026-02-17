@@ -18,6 +18,10 @@ struct Cli {
     #[arg(long, env = "HOTLINE_PROXY_URL")]
     proxy_url: Option<String>,
 
+    /// Bearer token for proxy authentication (or set HOTLINE_PROXY_TOKEN)
+    #[arg(long, env = "HOTLINE_PROXY_TOKEN")]
+    proxy_token: Option<String>,
+
     /// Linear team ID (required for direct mode, or set HOTLINE_TEAM_ID)
     #[arg(long, env = "HOTLINE_TEAM_ID")]
     team_id: Option<String>,
@@ -36,8 +40,13 @@ fn main() -> anyhow::Result<()> {
     ];
 
     let url = match (cli.proxy_url, cli.api_key) {
-        (Some(url), _) => hotln::proxy(&url)
-            .create_issue(&cli.title, cli.description.as_deref(), &system_info)?,
+        (Some(url), _) => {
+            let mut client = hotln::proxy(&url);
+            if let Some(token) = cli.proxy_token {
+                client = client.with_token(&token);
+            }
+            client.create_issue(&cli.title, cli.description.as_deref(), &system_info)?
+        }
         (None, Some(api_key)) => {
             let team_id = cli.team_id.ok_or_else(|| anyhow::anyhow!("--team-id is required for direct mode"))?;
             let project_id = cli.project_id.ok_or_else(|| anyhow::anyhow!("--project-id is required for direct mode"))?;

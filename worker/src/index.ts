@@ -2,7 +2,7 @@ interface Env {
 	LINEAR_API_KEY: string;
 	LINEAR_TEAM_ID: string;
 	LINEAR_PROJECT_ID: string;
-	RATE_LIMIT?: KVNamespace;
+	HOTLINE_PROXY_TOKEN?: string;
 }
 
 interface BugReportRequest {
@@ -11,8 +11,23 @@ interface BugReportRequest {
 }
 
 const LINEAR_API_URL = "https://api.linear.app/graphql";
-const RATE_LIMIT_MAX = 20;
-const RATE_LIMIT_WINDOW_SECONDS = 600; // 10 minutes
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+
+const hits = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+	const now = Date.now();
+	const cutoff = now - RATE_LIMIT_WINDOW_MS;
+	const timestamps = (hits.get(ip) ?? []).filter((t) => t > cutoff);
+	if (timestamps.length >= RATE_LIMIT_MAX) {
+		hits.set(ip, timestamps);
+		return true;
+	}
+	timestamps.push(now);
+	hits.set(ip, timestamps);
+	return false;
+}
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
@@ -20,22 +35,16 @@ export default {
 			return new Response("Method not allowed", { status: 405 });
 		}
 
-		const ip = request.headers.get("cf-connecting-ip");
-
-		if (!ip) {
-			console.warn("ip was null");
+		if (env.HOTLINE_PROXY_TOKEN) {
+			const authHeader = request.headers.get("Authorization");
+			if (!authHeader || authHeader !== `Bearer ${env.HOTLINE_PROXY_TOKEN}`) {
+				return new Response("Unauthorized", { status: 401 });
+			}
 		}
 
-		// Rate limiting (if KV namespace is configured).
-		if (env.RATE_LIMIT && ip) {
-			const key = `rate:${ip}`;
-			const count = parseInt((await env.RATE_LIMIT.get(key)) ?? "0");
-			if (count >= RATE_LIMIT_MAX) {
-				return new Response("Rate limit exceeded", { status: 429 });
-			}
-			await env.RATE_LIMIT.put(key, String(count + 1), {
-				expirationTtl: RATE_LIMIT_WINDOW_SECONDS,
-			});
+		const ip = request.headers.get("cf-connecting-ip");
+		if (ip && isRateLimited(ip)) {
+			return new Response("Rate limit exceeded", { status: 429 });
 		}
 
 		let body: BugReportRequest;
