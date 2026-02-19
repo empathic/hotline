@@ -21,8 +21,8 @@ const LINEAR_API_URL: &str = "https://api.linear.app/graphql";
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("HTTP request failed: {0}")]
-    Http(String),
+    #[error(transparent)]
+    Http(#[from] ureq::Error),
     #[error("Linear API error: {0}")]
     Api(String),
     #[error("Failed to parse response: {0}")]
@@ -138,15 +138,12 @@ impl ProxyClient {
         let resp_str = match req.send_string(&body) {
             Ok(resp) => resp
                 .into_string()
-                .map_err(|e| Error::Http(e.to_string()))?,
+                .map_err(|e| Error::Parse(e.to_string()))?,
             Err(ureq::Error::Status(code, resp)) => {
                 let body = resp.into_string().unwrap_or_default();
-                return Err(Error::Proxy {
-                    status: code,
-                    body,
-                });
+                return Err(Error::Proxy { status: code, body });
             }
-            Err(e) => return Err(Error::Http(e.to_string())),
+            Err(e) => return Err(e.into()),
         };
 
         let resp: serde_json::Value =
@@ -193,12 +190,15 @@ fn graphql_request(
     {
         Ok(resp) => resp
             .into_string()
-            .map_err(|e| Error::Http(format!("failed to read response body: {}", e)))?,
+            .map_err(|e| Error::Parse(e.to_string()))?,
         Err(ureq::Error::Status(code, resp)) => {
             let body = resp.into_string().unwrap_or_default();
-            return Err(Error::Api(format!("Linear API returned {}: {}", code, body)));
+            return Err(Error::Api(format!(
+                "Linear API returned {}: {}",
+                code, body
+            )));
         }
-        Err(e) => return Err(Error::Http(format!("failed to send request: {}", e))),
+        Err(e) => return Err(e.into()),
     };
 
     let resp_json: serde_json::Value =
@@ -242,12 +242,8 @@ mod tests {
             .create();
 
         let body = serde_json::json!({"query": "test"});
-        let resp = graphql_request(
-            &format!("{}/graphql", server.url()),
-            "test-key",
-            &body,
-        )
-        .unwrap();
+        let resp =
+            graphql_request(&format!("{}/graphql", server.url()), "test-key", &body).unwrap();
 
         assert_eq!(
             resp["data"]["issueCreate"]["issue"]["url"],
@@ -272,11 +268,7 @@ mod tests {
             .create();
 
         let body = serde_json::json!({"query": "test"});
-        let result = graphql_request(
-            &format!("{}/graphql", server.url()),
-            "test-key",
-            &body,
-        );
+        let result = graphql_request(&format!("{}/graphql", server.url()), "test-key", &body);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Linear API error"));
         mock.assert();

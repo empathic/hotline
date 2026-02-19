@@ -48,10 +48,17 @@ fn main() -> anyhow::Result<()> {
             client.create_issue(&cli.title, cli.description.as_deref(), &system_info)?
         }
         (None, Some(api_key)) => {
-            let team_id = cli.team_id.ok_or_else(|| anyhow::anyhow!("--team-id is required for direct mode"))?;
-            let project_id = cli.project_id.ok_or_else(|| anyhow::anyhow!("--project-id is required for direct mode"))?;
-            hotln::direct(&api_key, &team_id, &project_id)
-                .create_issue(&cli.title, cli.description.as_deref(), &system_info)?
+            let team_id = cli
+                .team_id
+                .ok_or_else(|| anyhow::anyhow!("--team-id is required for direct mode"))?;
+            let project_id = cli
+                .project_id
+                .ok_or_else(|| anyhow::anyhow!("--project-id is required for direct mode"))?;
+            hotln::direct(&api_key, &team_id, &project_id).create_issue(
+                &cli.title,
+                cli.description.as_deref(),
+                &system_info,
+            )?
         }
         (None, None) => anyhow::bail!(
             "Provide either --proxy-url / HOTLINE_PROXY_URL or --api-key / HOTLINE_API_KEY"
