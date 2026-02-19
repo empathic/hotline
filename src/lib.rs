@@ -15,6 +15,8 @@
 //! # Ok::<(), hotln::Error>(())
 //! ```
 
+pub use ureq;
+
 use tracing::{debug, info};
 
 const LINEAR_API_URL: &str = "https://api.linear.app/graphql";
