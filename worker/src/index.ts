@@ -1,7 +1,9 @@
 interface Env {
-	LINEAR_API_KEY: string;
-	LINEAR_TEAM_ID: string;
-	LINEAR_PROJECT_ID: string;
+	LINEAR_API_KEY?: string;
+	LINEAR_TEAM_ID?: string;
+	LINEAR_PROJECT_ID?: string;
+	GITHUB_TOKEN?: string;
+	GITHUB_REPO?: string;
 	HOTLINE_PROXY_TOKEN?: string;
 }
 
@@ -12,13 +14,19 @@ interface AttachmentRequest {
 	encoding?: "text" | "base64";
 }
 
-interface BugReportRequest {
+interface LinearRequest {
 	title: string;
 	description: string;
 	attachments?: AttachmentRequest[];
 }
 
+interface GitHubRequest {
+	title: string;
+	description: string;
+}
+
 const LINEAR_API_URL = "https://api.linear.app/graphql";
+const GITHUB_API_URL = "https://api.github.com";
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
@@ -55,90 +63,146 @@ export default {
 			return new Response("Rate limit exceeded", { status: 429 });
 		}
 
-		let body: BugReportRequest;
-		try {
-			body = await request.json();
-		} catch {
-			return new Response("Invalid JSON", { status: 400 });
+		const url = new URL(request.url);
+		switch (url.pathname) {
+			case "/linear":
+				return handleLinear(request, env);
+			case "/github":
+				return handleGitHub(request, env);
+			default:
+				return new Response("Not found", { status: 404 });
 		}
+	},
+};
 
-		if (!body.title || !body.description) {
-			return new Response("Missing title or description", { status: 400 });
+async function handleLinear(request: Request, env: Env): Promise<Response> {
+	if (!env.LINEAR_API_KEY || !env.LINEAR_TEAM_ID || !env.LINEAR_PROJECT_ID) {
+		return new Response("Linear backend not configured", { status: 500 });
+	}
+
+	let body: LinearRequest;
+	try {
+		body = await request.json();
+	} catch {
+		return new Response("Invalid JSON", { status: 400 });
+	}
+
+	if (!body.title || !body.description) {
+		return new Response("Missing title or description", { status: 400 });
+	}
+
+	const query = `mutation IssueCreate($input: IssueCreateInput!) {
+		issueCreate(input: $input) {
+			success
+			issue { id url }
 		}
+	}`;
 
-		// Use server-side team/project IDs, ignoring whatever the client sent.
-		const teamId = env.LINEAR_TEAM_ID;
-		const projectId = env.LINEAR_PROJECT_ID;
+	const resp = await fetch(LINEAR_API_URL, {
+		method: "POST",
+		headers: {
+			Authorization: env.LINEAR_API_KEY,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			query,
+			variables: {
+				input: {
+					teamId: env.LINEAR_TEAM_ID,
+					projectId: env.LINEAR_PROJECT_ID,
+					title: body.title,
+					description: body.description,
+				},
+			},
+		}),
+	});
 
-		if (!teamId || !projectId || !env.LINEAR_API_KEY) {
-			return new Response("Proxy not configured", { status: 500 });
-		}
+	if (!resp.ok) {
+		const text = await resp.text();
+		return new Response(`Linear API returned ${resp.status}: ${text}`, {
+			status: 502,
+		});
+	}
 
-		const query = `mutation IssueCreate($input: IssueCreateInput!) {
-			issueCreate(input: $input) {
-				success
-				issue { id url }
+	const data: any = await resp.json();
+
+	if (data.errors) {
+		const errMsg = JSON.stringify(data.errors);
+		return new Response(`Linear GraphQL errors: ${errMsg}`, { status: 502 });
+	}
+
+	const issue = data?.data?.issueCreate?.issue;
+	const url = issue?.url;
+	const issueId = issue?.id;
+	if (!url || !issueId) {
+		return new Response(`Unexpected Linear response: ${JSON.stringify(data)}`, {
+			status: 502,
+		});
+	}
+
+	if (body.attachments?.length) {
+		for (const att of body.attachments) {
+			try {
+				await uploadAttachment(env.LINEAR_API_KEY, issueId, att);
+			} catch (err) {
+				console.error(`Failed to attach ${att.filename}:`, err);
 			}
-		}`;
+		}
+	}
 
-		const resp = await fetch(LINEAR_API_URL, {
+	return Response.json({ url });
+}
+
+async function handleGitHub(request: Request, env: Env): Promise<Response> {
+	if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+		return new Response("GitHub backend not configured", { status: 500 });
+	}
+
+	let body: GitHubRequest;
+	try {
+		body = await request.json();
+	} catch {
+		return new Response("Invalid JSON", { status: 400 });
+	}
+
+	if (!body.title || !body.description) {
+		return new Response("Missing title or description", { status: 400 });
+	}
+
+	const resp = await fetch(
+		`${GITHUB_API_URL}/repos/${env.GITHUB_REPO}/issues`,
+		{
 			method: "POST",
 			headers: {
-				Authorization: env.LINEAR_API_KEY,
+				Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+				Accept: "application/vnd.github+json",
+				"User-Agent": "hotline",
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				query,
-				variables: {
-					input: {
-						teamId,
-						projectId,
-						title: body.title,
-						description: body.description,
-					},
-				},
+				title: body.title,
+				body: body.description,
 			}),
+		},
+	);
+
+	if (!resp.ok) {
+		const text = await resp.text();
+		return new Response(`GitHub API returned ${resp.status}: ${text}`, {
+			status: 502,
 		});
+	}
 
-		if (!resp.ok) {
-			const text = await resp.text();
-			return new Response(`Linear API returned ${resp.status}: ${text}`, {
-				status: 502,
-			});
-		}
+	const data: any = await resp.json();
+	const url = data?.html_url;
+	if (!url) {
+		return new Response(`Unexpected GitHub response: ${JSON.stringify(data)}`, {
+			status: 502,
+		});
+	}
 
-		const data: any = await resp.json();
-
-		if (data.errors) {
-			const errMsg = JSON.stringify(data.errors);
-			return new Response(`Linear GraphQL errors: ${errMsg}`, { status: 502 });
-		}
-
-		const issue = data?.data?.issueCreate?.issue;
-		const url = issue?.url;
-		const issueId = issue?.id;
-		if (!url || !issueId) {
-			return new Response(
-				`Unexpected Linear response: ${JSON.stringify(data)}`,
-				{ status: 502 },
-			);
-		}
-
-		// Upload attachments if present
-		if (body.attachments?.length) {
-			for (const att of body.attachments) {
-				try {
-					await uploadAttachment(env.LINEAR_API_KEY, issueId, att);
-				} catch (err) {
-					// Attachment failure is non-fatal — the issue was already created
-					console.error(`Failed to attach ${att.filename}:`, err);
-				}
-			}
-		}
-
-		return Response.json({ url });
-	},
-};
+	return Response.json({ url });
+}
 
 async function uploadAttachment(
 	apiKey: string,

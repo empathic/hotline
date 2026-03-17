@@ -1,10 +1,19 @@
 use std::path::Path;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+
+#[derive(Clone, ValueEnum)]
+enum Backend {
+    Github,
+    Linear,
+}
 
 #[derive(Parser)]
-#[command(about = "File a bug report to Linear")]
+#[command(about = "File a bug report")]
 struct Cli {
+    /// Backend to file the issue to
+    backend: Backend,
+
     /// Short summary of the bug
     title: String,
 
@@ -12,104 +21,92 @@ struct Cli {
     #[arg(short, long)]
     description: Option<String>,
 
-    /// Attach a file (repeatable)
-    #[arg(short, long = "attach")]
-    attach: Vec<String>,
+    /// Inline a file as a code block in the description (repeatable, must be UTF-8)
+    #[arg(short, long)]
+    file: Vec<String>,
 
-    /// Linear API key (or set HOTLINE_API_KEY)
-    #[arg(long, env = "HOTLINE_API_KEY")]
-    api_key: Option<String>,
+    /// Upload a file as an attachment (repeatable, binary OK, Linear only)
+    #[arg(short, long)]
+    attachment: Vec<String>,
 
-    /// Proxy URL to use instead of calling Linear directly (or set HOTLINE_PROXY_URL)
+    /// Proxy URL (or set HOTLINE_PROXY_URL)
     #[arg(long, env = "HOTLINE_PROXY_URL")]
-    proxy_url: Option<String>,
+    proxy_url: String,
 
-    /// Bearer token for proxy authentication (or set HOTLINE_PROXY_TOKEN)
+    /// Bearer token for proxy auth (or set HOTLINE_PROXY_TOKEN)
     #[arg(long, env = "HOTLINE_PROXY_TOKEN")]
     proxy_token: Option<String>,
-
-    /// Linear team ID (required for direct mode, or set HOTLINE_TEAM_ID)
-    #[arg(long, env = "HOTLINE_TEAM_ID")]
-    team_id: Option<String>,
-
-    /// Linear project ID (required for direct mode, or set HOTLINE_PROJECT_ID)
-    #[arg(long, env = "HOTLINE_PROJECT_ID")]
-    project_id: Option<String>,
 }
 
-fn mime_for_file(path: &Path, data: &[u8]) -> &'static str {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "json" => "application/json",
-        "pdf" => "application/pdf",
-        _ if std::str::from_utf8(data).is_ok() => "text/plain",
-        _ => "application/octet-stream",
-    }
+fn system_info_text() -> String {
+    format!(
+        "## System Info\n\n| Field | Value |\n|-------|-------|\n| OS | {} |\n| Arch | {} |",
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
+}
+
+fn read_file(path_str: &str) -> anyhow::Result<(String, Vec<u8>)> {
+    let path = Path::new(path_str);
+    let data = std::fs::read(path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {}", path.display(), e))?;
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("attachment")
+        .to_string();
+    Ok((filename, data))
+}
+
+fn read_file_text(path_str: &str) -> anyhow::Result<(String, String)> {
+    let (filename, data) = read_file(path_str)?;
+    let content = String::from_utf8(data)
+        .map_err(|_| anyhow::anyhow!("file is not valid UTF-8: {}", filename))?;
+    Ok((filename, content))
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    let system_info = [
-        ("OS", std::env::consts::OS),
-        ("Arch", std::env::consts::ARCH),
-    ];
-
-    let mut attachments = Vec::new();
-    for path_str in &cli.attach {
-        let path = Path::new(path_str);
-        let data = std::fs::read(path)
-            .map_err(|e| anyhow::anyhow!("failed to read {}: {}", path.display(), e))?;
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("attachment")
-            .to_string();
-        attachments.push(hotln::Attachment {
-            content_type: mime_for_file(path, &data).to_string(),
-            filename,
-            data,
-        });
+    if !cli.attachment.is_empty() && matches!(cli.backend, Backend::Github) {
+        anyhow::bail!("--attachment is only supported with the linear backend");
     }
 
-    let url = match (cli.proxy_url, cli.api_key) {
-        (Some(url), _) => {
-            let mut client = hotln::proxy(&url);
-            if let Some(token) = cli.proxy_token {
-                client = client.with_token(&token);
+    let system_info = system_info_text();
+
+    let url = match cli.backend {
+        Backend::Github => {
+            let mut issue = hotln::github(&cli.proxy_url).title(&cli.title);
+            if let Some(token) = &cli.proxy_token {
+                issue = issue.with_token(token);
             }
-            client.create_issue(
-                &cli.title,
-                cli.description.as_deref(),
-                &system_info,
-                &attachments,
-            )?
+            if let Some(desc) = &cli.description {
+                issue = issue.text(desc);
+            }
+            for path_str in &cli.file {
+                let (filename, content) = read_file_text(path_str)?;
+                issue = issue.file(&filename, &content);
+            }
+            issue.text(&system_info).create()?
         }
-        (None, Some(api_key)) => {
-            let team_id = cli
-                .team_id
-                .ok_or_else(|| anyhow::anyhow!("--team-id is required for direct mode"))?;
-            let project_id = cli
-                .project_id
-                .ok_or_else(|| anyhow::anyhow!("--project-id is required for direct mode"))?;
-            hotln::direct(&api_key, &team_id, &project_id).create_issue(
-                &cli.title,
-                cli.description.as_deref(),
-                &system_info,
-                &attachments,
-            )?
+        Backend::Linear => {
+            let mut issue = hotln::linear(&cli.proxy_url).title(&cli.title);
+            if let Some(token) = &cli.proxy_token {
+                issue = issue.with_token(token);
+            }
+            if let Some(desc) = &cli.description {
+                issue = issue.text(desc);
+            }
+            for path_str in &cli.file {
+                let (filename, content) = read_file_text(path_str)?;
+                issue = issue.file(&filename, &content);
+            }
+            for path_str in &cli.attachment {
+                let (filename, data) = read_file(path_str)?;
+                issue = issue.attachment(&filename, &data);
+            }
+            issue.text(&system_info).create()?
         }
-        (None, None) => anyhow::bail!(
-            "Provide either --proxy-url / HOTLINE_PROXY_URL or --api-key / HOTLINE_API_KEY"
-        ),
     };
 
     println!("{}", url);
