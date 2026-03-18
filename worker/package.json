@@ -1,8 +1,13 @@
 {
 	"name": "hotline-proxy",
 	"private": true,
+	"scripts": {
+		"fmt": "biome format --write src/",
+		"check": "wrangler deploy --dry-run"
+	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20241205.0",
+		"@biomejs/biome": "^1",
+		"@cloudflare/workers-types": "^4.20260317.0",
 		"wrangler": "^4.65.0"
 	}
 }
