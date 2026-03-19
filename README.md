@@ -1,60 +1,98 @@
 # hotline
 
-A Rust library for filing bug reports to [Linear](https://linear.app) from
-distributed applications. Supports calling the Linear API directly or going
-through a proxy server that holds the API key.
+A Rust library for filing bug reports to [Linear](https://linear.app) and
+[GitHub Issues](https://github.com) from distributed applications. Reports
+are sent through a proxy server that holds API credentials.
 
 ## Usage
 
 ```rust
-// Via proxy (recommended for distributed binaries)
-hotln::proxy("https://your-worker.example.com")
-    .with_token("your-proxy-token")
-    .create_issue("crash on startup", Some("details..."), &[("OS", "macos")])?;
+// GitHub
+hotln::github("https://your-worker.example.com")
+    .with_token("secret")
+    .title("crash on startup")
+    .text("Something went wrong.")
+    .file("config.toml", &toml_str)
+    .create()?;
 
-// Direct
-hotln::direct("lin_api_...", "team-id", "project-id")
-    .create_issue("crash on startup", Some("details..."), &[("OS", "macos")])?;
+// Linear
+hotln::linear("https://your-worker.example.com")
+    .with_token("secret")
+    .title("crash on startup")
+    .text("Details.")
+    .attachment("crash.log", &log_bytes)
+    .create()?;
 ```
+
+## Builder API
+
+Both backends use a fluent builder. Call `.create()` to send the request and
+get back a `Result<String, Error>` containing the issue URL.
+
+| Method | Description |
+|--------|-------------|
+| `.title(s)` | Set the issue title |
+| `.text(s)` | Append a text block to the body |
+| `.file(name, content)` | Append a fenced code block to the body |
+| `.attachment(name, data)` | **Linear only.** Upload as a real Linear attachment (binary OK) |
+| `.with_token(s)` | Set a bearer token for proxy auth |
+| `.create()` | Send the request and return the issue URL |
+
+`.text()` and `.file()` blocks are joined in order, separated by blank lines.
 
 ## Proxy protocol
 
-The client POSTs JSON to the proxy URL. The proxy creates the issue on Linear
-and returns the URL. Any server that implements this protocol can be used as a
-proxy. If `with_token` is set, the client sends an `Authorization: Bearer <token>`
-header.
+The client POSTs JSON to the proxy. Each backend has its own path:
 
-### Request
+- `POST /linear` — create a Linear issue
+- `POST /github` — create a GitHub issue
+
+If `with_token` is set, the client sends an `Authorization: Bearer <token>` header.
+
+### Linear request
 
 ```typescript
-interface Request {
-  title: string;        // Issue title
-  description: string;  // Formatted markdown body
+interface LinearRequest {
+  title: string;
+  description: string;
+  attachments?: {
+    filename: string;
+    contentType: string;
+    data: string;
+    encoding?: "text" | "base64";
+  }[];
 }
 ```
 
-### Response
+### GitHub request
+
+```typescript
+interface GitHubRequest {
+  title: string;
+  description: string;
+}
+```
+
+### Response (both backends)
 
 ```typescript
 interface Response {
-  url: string; // URL of the created Linear issue
+  url: string; // URL of the created issue
 }
 ```
 
-## Cloudflare worker
+## Cloudflare Worker
 
-A proxy implementation lives in `worker/`. It's a Cloudflare Worker that holds
-the Linear API key server-side, rate limits by IP, and only exposes issue
-creation.
+A reference proxy implementation lives in `worker/`. See
+[worker/README.md](worker/README.md) for setup and configuration.
 
-### Environment variables
+## CLI
 
-Set these as secrets in the Cloudflare dashboard (Settings > Variables and
-Secrets) or via `npx wrangler secret put <NAME>`:
+```
+hotln github "crash on startup" --proxy-url https://worker.example.com
+hotln linear "crash on startup" --proxy-url https://worker.example.com
+hotln linear "crash on startup" --proxy-url https://worker.example.com -f config.toml -a crash.log
+```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `LINEAR_API_KEY` | Yes | Linear API key used to create issues |
-| `LINEAR_TEAM_ID` | Yes | Linear team ID to file issues under |
-| `LINEAR_PROJECT_ID` | Yes | Linear project ID to file issues under |
-| `HOTLINE_PROXY_TOKEN` | No | When set, requires clients to send a matching `Authorization: Bearer <token>` header |
+All flags can also be set via environment variables (`HOTLINE_PROXY_URL`,
+`HOTLINE_PROXY_TOKEN`).

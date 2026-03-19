@@ -1,0 +1,12 @@
+[package]
+name = "hotline-cli"
+version = "0.2.0"
+edition = "2024"
+description = "CLI for filing bug reports to Linear or GitHub Issues"
+license = "Apache-2.0"
+repository = "https://github.com/empathic/hotline"
+
+[dependencies]
+hotln.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"

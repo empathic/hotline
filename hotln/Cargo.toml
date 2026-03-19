@@ -1,0 +1,17 @@
+[package]
+name = "hotln"
+version = "0.2.0"
+edition = "2024"
+description = "File bug reports to Linear or GitHub Issues via a proxy"
+license = "Apache-2.0"
+repository = "https://github.com/empathic/hotline"
+
+[dependencies]
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+ureq = "2"
+base64 = "0.22"
+
+[dev-dependencies]
+mockito = "1"
