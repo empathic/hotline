@@ -1,6 +1,6 @@
 [package]
 name = "hotline-cli"
-version = "0.2.0"
+version.workspace = true
 edition = "2024"
 description = "CLI for filing bug reports to Linear or GitHub Issues"
 license = "Apache-2.0"
