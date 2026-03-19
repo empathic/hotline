@@ -5,6 +5,7 @@ edition = "2024"
 description = "CLI for filing bug reports to Linear or GitHub Issues"
 license = "Apache-2.0"
 repository = "https://github.com/empathic/hotline"
+publish = false
 
 [dependencies]
 hotln.workspace = true
