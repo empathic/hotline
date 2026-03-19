@@ -83,4 +83,24 @@ mod tests {
         let result = inline_file("config.toml", "key = \"value\"");
         assert_eq!(result, "**config.toml**\n```toml\nkey = \"value\"\n```");
     }
+
+    #[test]
+    fn test_inline_file_no_extension() {
+        let result = inline_file("Makefile", "all: build");
+        assert_eq!(result, "**Makefile**\n```Makefile\nall: build\n```");
+    }
+
+    #[test]
+    fn test_mime_for_ext() {
+        assert_eq!(mime_for_ext("photo.png"), "image/png");
+        assert_eq!(mime_for_ext("photo.jpg"), "image/jpeg");
+        assert_eq!(mime_for_ext("photo.jpeg"), "image/jpeg");
+        assert_eq!(mime_for_ext("anim.gif"), "image/gif");
+        assert_eq!(mime_for_ext("data.json"), "application/json");
+        assert_eq!(mime_for_ext("doc.pdf"), "application/pdf");
+        assert_eq!(mime_for_ext("log.txt"), "text/plain");
+        assert_eq!(mime_for_ext("output.log"), "text/plain");
+        assert_eq!(mime_for_ext("archive.tar.gz"), "application/octet-stream");
+        assert_eq!(mime_for_ext("noext"), "application/octet-stream");
+    }
 }

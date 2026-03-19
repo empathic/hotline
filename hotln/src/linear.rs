@@ -127,7 +127,7 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
-                    "url": "https://linear.app/empathic/issue/EMP-99"
+                    "url": "https://linear.app/test-org/issue/TEST-99"
                 })
                 .to_string(),
             )
@@ -139,7 +139,7 @@ mod tests {
             .create()
             .unwrap();
 
-        assert_eq!(url, "https://linear.app/empathic/issue/EMP-99");
+        assert_eq!(url, "https://linear.app/test-org/issue/TEST-99");
         mock.assert();
     }
 
@@ -154,7 +154,7 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
-                    "url": "https://linear.app/empathic/issue/EMP-100"
+                    "url": "https://linear.app/test-org/issue/TEST-100"
                 })
                 .to_string(),
             )
@@ -167,7 +167,7 @@ mod tests {
             .create()
             .unwrap();
 
-        assert_eq!(url, "https://linear.app/empathic/issue/EMP-100");
+        assert_eq!(url, "https://linear.app/test-org/issue/TEST-100");
         mock.assert();
     }
 
@@ -216,7 +216,7 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
-                    "url": "https://linear.app/empathic/issue/EMP-51"
+                    "url": "https://linear.app/test-org/issue/TEST-51"
                 })
                 .to_string(),
             )
@@ -229,7 +229,43 @@ mod tests {
             .create()
             .unwrap();
 
-        assert_eq!(url, "https://linear.app/empathic/issue/EMP-51");
+        assert_eq!(url, "https://linear.app/test-org/issue/TEST-51");
+        mock.assert();
+    }
+
+    #[test]
+    fn test_binary_attachment_base64() {
+        let mut server = mockito::Server::new();
+        let binary_data: &[u8] = &[0xff, 0xd8, 0xff, 0xe0]; // not valid UTF-8
+        let mock = server
+            .mock("POST", "/linear")
+            .match_body(mockito::Matcher::PartialJsonString(
+                serde_json::json!({
+                    "attachments": [{
+                        "filename": "image.png",
+                        "contentType": "image/png",
+                        "encoding": "base64",
+                    }]
+                })
+                .to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "url": "https://linear.app/test-org/issue/TEST-52"
+                })
+                .to_string(),
+            )
+            .create();
+
+        let url = Issue::new(&server.url())
+            .title("binary test")
+            .attachment("image.png", binary_data)
+            .create()
+            .unwrap();
+
+        assert_eq!(url, "https://linear.app/test-org/issue/TEST-52");
         mock.assert();
     }
 }

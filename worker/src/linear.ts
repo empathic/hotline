@@ -34,8 +34,8 @@ export async function handleLinear(
 		return new Response("Invalid JSON", { status: 400 });
 	}
 
-	if (!body.title || !body.description) {
-		return new Response("Missing title or description", { status: 400 });
+	if (!body.title) {
+		return new Response("Missing title", { status: 400 });
 	}
 
 	const query = `mutation IssueCreate($input: IssueCreateInput!) {
