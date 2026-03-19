@@ -41,6 +41,7 @@ pub fn linear(proxy_url: &str) -> LinearIssue {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error(transparent)]
     Http(Box<ureq::Error>),

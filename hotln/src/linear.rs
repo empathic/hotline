@@ -53,7 +53,7 @@ impl Issue {
         self
     }
 
-    /// Consume the builder and create the issue via proxy. Returns the issue URL.
+    /// Consume the builder and create the issue. Returns the issue URL.
     pub fn create(self) -> Result<String, Error> {
         let encoded_attachments: Vec<serde_json::Value> = self
             .attachments
