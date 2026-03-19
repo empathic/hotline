@@ -24,25 +24,55 @@ unconfigured backend return 500.
 
 ## Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `LINEAR_API_KEY` | For Linear | Linear API key |
-| `LINEAR_TEAM_ID` | For Linear | Linear team ID |
-| `LINEAR_PROJECT_ID` | For Linear | Linear project ID |
-| `GITHUB_TOKEN` | For GitHub | GitHub personal access token |
-| `GITHUB_REPO` | For GitHub | Repo in `owner/repo` format |
-| `HOTLINE_PROXY_TOKEN` | No | When set, requires `Authorization: Bearer <token>` on all requests |
+### GitHub
+
+Two auth modes. If both are configured, the GitHub App is used.
+
+**GitHub App (recommended):**
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_APP_ID` | GitHub App numeric ID |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App private key (PKCS#8 PEM) |
+| `GITHUB_INSTALLATION_ID` | Installation ID from installing the app on your repo |
+| `GITHUB_REPO` | Repo in `owner/repo` format |
+
+GitHub generates PKCS#1 keys by default. Convert to PKCS#8 first:
+```sh
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key.pem -out private-key-pkcs8.pem
+```
+
+**Personal access token:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub personal access token |
+| `GITHUB_REPO` | Repo in `owner/repo` format |
+
+### Linear
+
+| Variable | Description |
+|----------|-------------|
+| `LINEAR_API_KEY` | Linear API key |
+| `LINEAR_TEAM_ID` | Linear team ID |
+| `LINEAR_PROJECT_ID` | Linear project ID |
+
+### Shared
+
+| Variable | Description |
+|----------|-------------|
+| `HOTLINE_PROXY_TOKEN` | When set, requires `Authorization: Bearer <token>` on all requests |
 
 ## Development
 
 ```sh
-npx wrangler dev
+just dev
 ```
 
 ## Deploy
 
 ```sh
-npx wrangler deploy
+just deploy
 npx wrangler secret put <var>
 ```
 

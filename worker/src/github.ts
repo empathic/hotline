@@ -1,6 +1,11 @@
-interface GitHubEnv {
+import { createAppAuth } from "@octokit/auth-app";
+
+export interface GitHubEnv {
 	GITHUB_TOKEN?: string;
 	GITHUB_REPO?: string;
+	GITHUB_APP_ID?: string;
+	GITHUB_APP_PRIVATE_KEY?: string;
+	GITHUB_INSTALLATION_ID?: string;
 }
 
 interface GitHubRequest {
@@ -14,7 +19,32 @@ export async function handleGitHub(
 	request: Request,
 	env: GitHubEnv,
 ): Promise<Response> {
-	if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+	if (!env.GITHUB_REPO) {
+		return new Response("GitHub backend not configured: missing GITHUB_REPO", {
+			status: 500,
+		});
+	}
+
+	let token: string;
+	if (
+		env.GITHUB_APP_ID &&
+		env.GITHUB_APP_PRIVATE_KEY &&
+		env.GITHUB_INSTALLATION_ID
+	) {
+		try {
+			const auth = createAppAuth({
+				appId: env.GITHUB_APP_ID,
+				privateKey: env.GITHUB_APP_PRIVATE_KEY,
+				installationId: env.GITHUB_INSTALLATION_ID,
+			});
+			const { token: t } = await auth({ type: "installation" });
+			token = t;
+		} catch (err) {
+			return new Response(`GitHub App auth failed: ${err}`, { status: 502 });
+		}
+	} else if (env.GITHUB_TOKEN) {
+		token = env.GITHUB_TOKEN;
+	} else {
 		return new Response("GitHub backend not configured", { status: 500 });
 	}
 
@@ -34,7 +64,7 @@ export async function handleGitHub(
 		{
 			method: "POST",
 			headers: {
-				Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+				Authorization: `Bearer ${token}`,
 				Accept: "application/vnd.github+json",
 				"User-Agent": "hotline",
 				"Content-Type": "application/json",

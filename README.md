@@ -89,10 +89,10 @@ A reference proxy implementation lives in `worker/`. See
 ## CLI
 
 ```
-hotln "crash on startup" --proxy-url https://worker.example.com
-hotln "crash on startup" --proxy-url https://worker.example.com --backend github
-hotln "crash on startup" --proxy-url https://worker.example.com -a crash.log
+hotln github "crash on startup" --proxy-url https://worker.example.com
+hotln linear "crash on startup" --proxy-url https://worker.example.com
+hotln linear "crash on startup" --proxy-url https://worker.example.com -f config.toml -a crash.log
 ```
 
 All flags can also be set via environment variables (`HOTLINE_PROXY_URL`,
-`HOTLINE_PROXY_TOKEN`). The default backend is `linear`.
+`HOTLINE_PROXY_TOKEN`).
