@@ -51,6 +51,7 @@ export default {
 
 		const url = new URL(request.url);
 		switch (url.pathname) {
+			case "/": // for backwards compatibility with v0.1
 			case "/linear":
 				return handleLinear(request, env);
 			case "/github":

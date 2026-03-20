@@ -3,4 +3,4 @@ target/
 node_modules/
 .wrangler/
 .env
-.dev.vars
+*.vars
