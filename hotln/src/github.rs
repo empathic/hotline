@@ -1,5 +1,3 @@
-use tracing::info;
-
 use crate::{Error, inline_file};
 
 pub struct Issue {
@@ -19,17 +17,17 @@ impl Issue {
         }
     }
 
-    pub fn with_token(mut self, token: &str) -> Self {
+    pub fn with_token(&mut self, token: &str) -> &mut Self {
         self.token = Some(token.to_string());
         self
     }
 
-    pub fn title(mut self, title: &str) -> Self {
+    pub fn title(&mut self, title: &str) -> &mut Self {
         self.title = title.to_string();
         self
     }
 
-    pub fn text(mut self, text: &str) -> Self {
+    pub fn text(&mut self, text: &str) -> &mut Self {
         if !self.description.is_empty() {
             self.description.push_str("\n\n");
         }
@@ -37,7 +35,7 @@ impl Issue {
         self
     }
 
-    pub fn file(mut self, filename: &str, content: &str) -> Self {
+    pub fn file(&mut self, filename: &str, content: &str) -> &mut Self {
         if !self.description.is_empty() {
             self.description.push_str("\n\n");
         }
@@ -45,8 +43,8 @@ impl Issue {
         self
     }
 
-    /// Consume the builder and create the issue. Returns the issue URL.
-    pub fn create(self) -> Result<String, Error> {
+    /// Create the issue. Returns the issue URL.
+    pub fn create(&self) -> Result<String, Error> {
         let payload = serde_json::json!({
             "title": self.title,
             "description": self.description,
@@ -77,7 +75,6 @@ impl Issue {
             .ok_or_else(|| Error::Parse("proxy response missing url".into()))?
             .to_string();
 
-        info!(url = %url, "Created GitHub issue via proxy");
         Ok(url)
     }
 }

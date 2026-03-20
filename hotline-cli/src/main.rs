@@ -76,36 +76,40 @@ fn main() -> anyhow::Result<()> {
 
     let url = match cli.backend {
         Backend::Github => {
-            let mut issue = hotln::github(&cli.proxy_url).title(&cli.title);
+            let mut issue = hotln::github(&cli.proxy_url);
+            issue.title(&cli.title);
             if let Some(token) = &cli.proxy_token {
-                issue = issue.with_token(token);
+                issue.with_token(token);
             }
             if let Some(desc) = &cli.description {
-                issue = issue.text(desc);
+                issue.text(desc);
             }
             for path_str in &cli.file {
                 let (filename, content) = read_file_text(path_str)?;
-                issue = issue.file(&filename, &content);
+                issue.file(&filename, &content);
             }
-            issue.text(&system_info).create()?
+            issue.text(&system_info);
+            issue.create()?
         }
         Backend::Linear => {
-            let mut issue = hotln::linear(&cli.proxy_url).title(&cli.title);
+            let mut issue = hotln::linear(&cli.proxy_url);
+            issue.title(&cli.title);
             if let Some(token) = &cli.proxy_token {
-                issue = issue.with_token(token);
+                issue.with_token(token);
             }
             if let Some(desc) = &cli.description {
-                issue = issue.text(desc);
+                issue.text(desc);
             }
             for path_str in &cli.file {
                 let (filename, content) = read_file_text(path_str)?;
-                issue = issue.file(&filename, &content);
+                issue.file(&filename, &content);
             }
             for path_str in &cli.attachment {
                 let (filename, data) = read_file(path_str)?;
-                issue = issue.attachment(&filename, &data);
+                issue.attachment(&filename, &data);
             }
-            issue.text(&system_info).create()?
+            issue.text(&system_info);
+            issue.create()?
         }
     };
 

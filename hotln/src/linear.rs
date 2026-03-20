@@ -1,5 +1,4 @@
 use base64::prelude::*;
-use tracing::info;
 
 use crate::{Error, inline_file, mime_for_ext};
 
@@ -22,17 +21,17 @@ impl Issue {
         }
     }
 
-    pub fn with_token(mut self, token: &str) -> Self {
+    pub fn with_token(&mut self, token: &str) -> &mut Self {
         self.token = Some(token.to_string());
         self
     }
 
-    pub fn title(mut self, title: &str) -> Self {
+    pub fn title(&mut self, title: &str) -> &mut Self {
         self.title = title.to_string();
         self
     }
 
-    pub fn text(mut self, text: &str) -> Self {
+    pub fn text(&mut self, text: &str) -> &mut Self {
         if !self.description.is_empty() {
             self.description.push_str("\n\n");
         }
@@ -40,7 +39,7 @@ impl Issue {
         self
     }
 
-    pub fn file(mut self, filename: &str, content: &str) -> Self {
+    pub fn file(&mut self, filename: &str, content: &str) -> &mut Self {
         if !self.description.is_empty() {
             self.description.push_str("\n\n");
         }
@@ -48,13 +47,13 @@ impl Issue {
         self
     }
 
-    pub fn attachment(mut self, filename: &str, data: &[u8]) -> Self {
+    pub fn attachment(&mut self, filename: &str, data: &[u8]) -> &mut Self {
         self.attachments.push((filename.to_string(), data.to_vec()));
         self
     }
 
-    /// Consume the builder and create the issue. Returns the issue URL.
-    pub fn create(self) -> Result<String, Error> {
+    /// Create the issue. Returns the issue URL.
+    pub fn create(&self) -> Result<String, Error> {
         let encoded_attachments: Vec<serde_json::Value> = self
             .attachments
             .iter()
@@ -108,7 +107,6 @@ impl Issue {
             .ok_or_else(|| Error::Parse("proxy response missing url".into()))?
             .to_string();
 
-        info!(url = %url, "Created Linear issue via proxy");
         Ok(url)
     }
 }
