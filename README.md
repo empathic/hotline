@@ -1,8 +1,13 @@
 # hotline
 
-A Rust library for filing bug reports to [Linear](https://linear.app) and
+[![crates.io](https://img.shields.io/crates/v/hotln)](https://crates.io/crates/hotln)
+[![npm](https://img.shields.io/npm/v/hotln)](https://www.npmjs.com/package/hotln)
+
+A library for filing bug reports to [Linear](https://linear.app) and
 [GitHub Issues](https://github.com) from distributed applications. Reports
 are sent through a proxy server that holds API credentials.
+
+Available for [Rust](https://crates.io/crates/hotln) and [TypeScript/JavaScript](https://www.npmjs.com/package/hotln).
 
 ## Usage
 
