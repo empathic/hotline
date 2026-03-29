@@ -1,4 +1,4 @@
-interface LinearEnv {
+export interface LinearEnv {
 	LINEAR_API_KEY?: string;
 	LINEAR_TEAM_ID?: string;
 	LINEAR_PROJECT_ID?: string;
@@ -29,7 +29,7 @@ export async function handleLinear(
 
 	let body: LinearRequest;
 	try {
-		body = await request.json();
+		body = (await request.json()) as LinearRequest;
 	} catch {
 		return new Response("Invalid JSON", { status: 400 });
 	}

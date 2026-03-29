@@ -2,26 +2,28 @@
 
 [![crates.io](https://img.shields.io/crates/v/hotln)](https://crates.io/crates/hotln)
 [![npm](https://img.shields.io/npm/v/hotln)](https://www.npmjs.com/package/hotln)
+[![npm](https://img.shields.io/npm/v/hotln-proxy?label=hotln-proxy)](https://www.npmjs.com/package/hotln-proxy)
 
 A library for filing bug reports to [Linear](https://linear.app) and
 [GitHub Issues](https://github.com) from distributed applications. Reports
 are sent through a proxy server that holds API credentials.
 
 Available for [Rust](https://crates.io/crates/hotln) and [TypeScript/JavaScript](https://www.npmjs.com/package/hotln).
+The proxy server is available as [`hotln-proxy`](https://www.npmjs.com/package/hotln-proxy).
 
 ## Usage
 
+### Rust
+
 ```rust
-// GitHub
-hotln::github("https://your-worker.example.com")
+hotln::github("https://your-proxy.example.com")
     .with_token("secret")
     .title("crash on startup")
     .text("Something went wrong.")
     .file("config.toml", &toml_str)
     .create()?;
 
-// Linear
-hotln::linear("https://your-worker.example.com")
+hotln::linear("https://your-proxy.example.com")
     .with_token("secret")
     .title("crash on startup")
     .text("Details.")
@@ -29,10 +31,31 @@ hotln::linear("https://your-worker.example.com")
     .create()?;
 ```
 
+### TypeScript
+
+```typescript
+import hotln from "hotln";
+
+await hotln.github("https://your-proxy.example.com")
+    .withToken("secret")
+    .title("crash on startup")
+    .text("Something went wrong.")
+    .file("config.toml", tomlStr)
+    .create();
+
+await hotln.linear("https://your-proxy.example.com")
+    .withToken("secret")
+    .title("crash on startup")
+    .text("Details.")
+    .attachment("crash.log", logBytes)
+    .create();
+```
+
 ## Builder API
 
 Both backends use a fluent builder. Call `.create()` to send the request and
-get back a `Result<String, Error>` containing the issue URL.
+get back the issue URL (`Result<String, Error>` in Rust, `Promise<string>` in
+TypeScript).
 
 | Method | Description |
 |--------|-------------|
@@ -86,10 +109,10 @@ interface Response {
 }
 ```
 
-## Cloudflare Worker
+## Proxy
 
-A reference proxy implementation lives in `worker/`. See
-[worker/README.md](worker/README.md) for setup and configuration.
+A reference proxy implementation lives in `hotln-proxy/`. See
+[hotln-proxy/README.md](hotln-proxy/README.md) for setup and configuration.
 
 ## CLI
 

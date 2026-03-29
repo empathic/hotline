@@ -1,14 +1,15 @@
 check:
-    cargo fmt --check
+    cargo fmt
     cargo clippy
     cargo test
-    cd worker && npm run fmt
-    cd worker && npm run check
+    cd hotln-proxy && npm run fmt
+    cd hotln-proxy && npm run check
+    cd hotln-ts && npm run fmt
+    cd hotln-ts && npm run check
     cd hotln-ts && npm test
-    cd hotln-ts && npx biome format src/
 
 dev:
-    cd worker && npx wrangler dev
+    cd hotln-proxy && npx wrangler dev
 
 deploy:
-    cd worker && npx wrangler deploy
+    cd hotln-proxy && npx wrangler deploy

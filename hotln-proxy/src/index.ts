@@ -1,7 +1,10 @@
 import { handleGitHub } from "./github";
 import { handleLinear } from "./linear";
 
-interface Env {
+export { handleGitHub, type GitHubEnv } from "./github";
+export { handleLinear, type LinearEnv } from "./linear";
+
+export interface Env {
 	LINEAR_API_KEY?: string;
 	LINEAR_TEAM_ID?: string;
 	LINEAR_PROJECT_ID?: string;
@@ -11,18 +14,17 @@ interface Env {
 	GITHUB_APP_PRIVATE_KEY?: string;
 	GITHUB_INSTALLATION_ID?: string;
 	HOTLINE_PROXY_TOKEN?: string;
+	RATE_LIMIT_MAX?: string;
+	RATE_LIMIT_WINDOW_MS?: string;
 }
-
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 const hits = new Map<string, number[]>();
 
-function isRateLimited(ip: string): boolean {
+function isRateLimited(ip: string, max: number, windowMs: number): boolean {
 	const now = Date.now();
-	const cutoff = now - RATE_LIMIT_WINDOW_MS;
+	const cutoff = now - windowMs;
 	const timestamps = (hits.get(ip) ?? []).filter((t) => t > cutoff);
-	if (timestamps.length >= RATE_LIMIT_MAX) {
+	if (timestamps.length >= max) {
 		hits.set(ip, timestamps);
 		return true;
 	}
@@ -31,11 +33,27 @@ function isRateLimited(ip: string): boolean {
 	return false;
 }
 
+function resolveEnv(platformEnv?: Env): Env {
+	if (platformEnv) return platformEnv;
+	if (typeof process !== "undefined") return process.env as Env;
+	return {};
+}
+
+function clientIp(request: Request): string | null {
+	return (
+		request.headers.get("cf-connecting-ip") ??
+		request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+		null
+	);
+}
+
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, platformEnv?: Env): Promise<Response> {
 		if (request.method !== "POST") {
 			return new Response("Method not allowed", { status: 405 });
 		}
+
+		const env = resolveEnv(platformEnv);
 
 		if (env.HOTLINE_PROXY_TOKEN) {
 			const authHeader = request.headers.get("Authorization");
@@ -44,8 +62,10 @@ export default {
 			}
 		}
 
-		const ip = request.headers.get("cf-connecting-ip");
-		if (ip && isRateLimited(ip)) {
+		const ip = clientIp(request);
+		const max = Number(env.RATE_LIMIT_MAX) || 5;
+		const windowMs = Number(env.RATE_LIMIT_WINDOW_MS) || 60_000;
+		if (ip && isRateLimited(ip, max, windowMs)) {
 			return new Response("Rate limit exceeded", { status: 429 });
 		}
 

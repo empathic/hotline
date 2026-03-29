@@ -50,7 +50,7 @@ export async function handleGitHub(
 
 	let body: GitHubRequest;
 	try {
-		body = await request.json();
+		body = (await request.json()) as GitHubRequest;
 	} catch {
 		return new Response("Invalid JSON", { status: 400 });
 	}
