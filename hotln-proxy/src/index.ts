@@ -16,6 +16,7 @@ export interface Env {
 	HOTLINE_PROXY_TOKEN?: string;
 	RATE_LIMIT_MAX?: string;
 	RATE_LIMIT_WINDOW_MS?: string;
+	CORS_ORIGIN?: string;
 }
 
 const hits = new Map<string, number[]>();
@@ -47,37 +48,56 @@ function clientIp(request: Request): string | null {
 	);
 }
 
+async function handleRequest(request: Request, env: Env): Promise<Response> {
+	if (request.method !== "POST") {
+		return new Response("Method not allowed", { status: 405 });
+	}
+
+	if (env.HOTLINE_PROXY_TOKEN) {
+		const authHeader = request.headers.get("Authorization");
+		if (!authHeader || authHeader !== `Bearer ${env.HOTLINE_PROXY_TOKEN}`) {
+			return new Response("Unauthorized", { status: 401 });
+		}
+	}
+
+	const ip = clientIp(request);
+	const max = Number(env.RATE_LIMIT_MAX) || 5;
+	const windowMs = Number(env.RATE_LIMIT_WINDOW_MS) || 60_000;
+	if (ip && isRateLimited(ip, max, windowMs)) {
+		return new Response("Rate limit exceeded", { status: 429 });
+	}
+
+	const url = new URL(request.url);
+	switch (url.pathname) {
+		case "/": // for backwards compatibility with v0.1
+		case "/linear":
+			return handleLinear(request, env);
+		case "/github":
+			return handleGitHub(request, env);
+		default:
+			return new Response("Not found", { status: 404 });
+	}
+}
+
 export default {
 	async fetch(request: Request, platformEnv?: Env): Promise<Response> {
-		if (request.method !== "POST") {
-			return new Response("Method not allowed", { status: 405 });
-		}
-
 		const env = resolveEnv(platformEnv);
+		const origin = env.CORS_ORIGIN || "*";
 
-		if (env.HOTLINE_PROXY_TOKEN) {
-			const authHeader = request.headers.get("Authorization");
-			if (!authHeader || authHeader !== `Bearer ${env.HOTLINE_PROXY_TOKEN}`) {
-				return new Response("Unauthorized", { status: 401 });
-			}
+		if (request.method === "OPTIONS") {
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Access-Control-Allow-Origin": origin,
+					"Access-Control-Allow-Methods": "POST",
+					"Access-Control-Allow-Headers": "Content-Type, Authorization",
+					"Access-Control-Max-Age": "86400",
+				},
+			});
 		}
 
-		const ip = clientIp(request);
-		const max = Number(env.RATE_LIMIT_MAX) || 5;
-		const windowMs = Number(env.RATE_LIMIT_WINDOW_MS) || 60_000;
-		if (ip && isRateLimited(ip, max, windowMs)) {
-			return new Response("Rate limit exceeded", { status: 429 });
-		}
-
-		const url = new URL(request.url);
-		switch (url.pathname) {
-			case "/": // for backwards compatibility with v0.1
-			case "/linear":
-				return handleLinear(request, env);
-			case "/github":
-				return handleGitHub(request, env);
-			default:
-				return new Response("Not found", { status: 404 });
-		}
+		const response = await handleRequest(request, env);
+		response.headers.set("Access-Control-Allow-Origin", origin);
+		return response;
 	},
 };

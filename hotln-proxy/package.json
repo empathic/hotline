@@ -1,6 +1,6 @@
 {
 	"name": "hotln-proxy",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Proxy server for filing bug reports to Linear and GitHub Issues",
 	"type": "module",
 	"exports": {

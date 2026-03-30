@@ -78,6 +78,7 @@ openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key.pem -out 
 | `HOTLINE_PROXY_TOKEN` | When set, requires `Authorization: Bearer <token>` on all requests |
 | `RATE_LIMIT_MAX` | Max requests per window per IP (default: `5`) |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window in milliseconds (default: `60000`) |
+| `CORS_ORIGIN` | `Access-Control-Allow-Origin` value (default: `*`) |
 
 ## Custom routing
 
